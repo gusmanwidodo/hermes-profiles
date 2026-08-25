@@ -22,6 +22,82 @@ async function get(url) {
   return res.json();
 }
 
+/**
+ * Fetch a host that the local resolver may be lying about.
+ *
+ * Some ISPs answer blocked domains with a block page instead of the real
+ * address — api.binance.com resolving to aduankonten.id, for instance. The IPs
+ * are reachable; only DNS is poisoned. So resolve over DoH, which the ISP
+ * cannot forge, and connect to that address directly.
+ *
+ * Addressing the IP in the URL does not work: TLS then sends the IP as SNI and
+ * the server rejects the handshake. The hostname has to stay in the URL while
+ * the socket is pointed elsewhere, which is what a custom lookup does.
+ *
+ * With system-level DNS-over-TLS configured this path is never taken — the
+ * plain fetch succeeds first.
+ */
+async function getViaDoH(host, path) {
+  try {
+    return await get(`https://${host}${path}`);
+  } catch {
+    // Fall through to explicit DoH resolution.
+  }
+
+  // Cloudflare's DoH endpoint requires this exact Accept header. Sending
+  // application/json returns HTTP 400.
+  const doh = await fetch(
+    `https://cloudflare-dns.com/dns-query?name=${host}&type=A`,
+    {
+      signal: AbortSignal.timeout(TIMEOUT),
+      headers: { accept: "application/dns-json" },
+    },
+  )
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+
+  const ip = doh?.Answer?.filter((a) => a.type === 1)?.[0]?.data;
+  if (!ip) throw new Error(`could not resolve ${host} via DoH`);
+
+  const { Agent } = await import("node:https");
+  const agent = new Agent({
+    // Point the socket at the DoH-resolved address while leaving the URL —
+    // and therefore SNI and certificate validation — on the real hostname.
+    // The callback must hand back an array of {address, family}; the
+    // (err, address, family) form throws ERR_INVALID_IP_ADDRESS here.
+    lookup: (_hostname, _opts, cb) => cb(null, [{ address: ip, family: 4 }]),
+  });
+
+  const { request } = await import("node:https");
+
+  return new Promise((resolve, reject) => {
+    const r = request(
+      `https://${host}${path}`,
+      { agent, headers: { accept: "application/json" }, timeout: TIMEOUT },
+      (res) => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          reject(new Error(`HTTP ${res.statusCode} (via ${ip})`));
+          return;
+        }
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => (body += c));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(body));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
+    );
+    r.on("timeout", () => r.destroy(new Error("timeout")));
+    r.on("error", reject);
+    r.end();
+  });
+}
+
 const out = { fetched_at: new Date().toISOString(), sources: {}, errors: {} };
 
 // ── Prices ─────────────────────────────────────────────────────────────────
@@ -143,6 +219,44 @@ try {
   out.errors.ath = `CoinPaprika: ${e.message}`;
 }
 
+// ── Derivatives positioning ────────────────────────────────────────────────
+// Funding rate is what perpetual longs pay shorts (or vice versa) to keep the
+// contract tethered to spot. Persistently positive means leveraged longs are
+// crowded and paying to stay in — historically a condition that precedes long
+// squeezes. Negative means the reverse. It is a positioning read, not a signal.
+try {
+  const funding = {};
+  for (const [sym, pair] of Object.entries({
+    BTC: "BTCUSDT",
+    ETH: "ETHUSDT",
+    BNB: "BNBUSDT",
+    SOL: "SOLUSDT",
+  })) {
+    try {
+      const d = await getViaDoH(
+        "fapi.binance.com",
+        `/fapi/v1/premiumIndex?symbol=${pair}`,
+      );
+      const rate = Number(d.lastFundingRate);
+      funding[sym] = {
+        rate_pct: +(rate * 100).toFixed(4),
+        // Funding settles every 8h on Binance, so 3 periods a day.
+        annualized_pct: +(rate * 3 * 365 * 100).toFixed(1),
+        mark_price: Number(d.markPrice),
+      };
+    } catch {
+      funding[sym] = null;
+    }
+  }
+  if (Object.values(funding).some(Boolean)) {
+    out.sources.funding_rate = funding;
+  } else {
+    out.errors.funding_rate = "Binance futures unreachable (check DNS)";
+  }
+} catch (e) {
+  out.errors.funding_rate = `Binance futures: ${e.message}`;
+}
+
 // ── Report ─────────────────────────────────────────────────────────────────
 if (JSON_OUT) {
   console.log(JSON.stringify(out, null, 2));
@@ -215,6 +329,22 @@ if (out.sources.ath_and_supply) {
         ? `${((d.supply / d.max_supply) * 100).toFixed(1)}% of max issued`
         : "no max supply";
     console.log(`  ${sym.padEnd(4)} ${pct(d.pct_from_ath).padEnd(10)} from ATH (${d.ath_date?.slice(0, 10)})  ${supply}`);
+  }
+}
+
+if (out.sources.funding_rate) {
+  console.log("\nFUNDING RATE — perpetuals (Binance)");
+  for (const [sym, f] of Object.entries(out.sources.funding_rate)) {
+    if (!f) {
+      console.log(`  ${sym.padEnd(4)} unavailable`);
+      continue;
+    }
+    const lean =
+      f.rate_pct > 0.01 ? "longs paying" : f.rate_pct < -0.01 ? "shorts paying" : "balanced";
+    console.log(
+      `  ${sym.padEnd(4)} ${(f.rate_pct >= 0 ? "+" : "") + f.rate_pct.toFixed(4)}% per 8h  ` +
+        `(${(f.annualized_pct >= 0 ? "+" : "") + f.annualized_pct}% annualized)  ${lean}`,
+    );
   }
 }
 

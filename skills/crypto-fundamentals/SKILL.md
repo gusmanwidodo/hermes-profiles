@@ -32,10 +32,36 @@ Three rules that override everything below:
 
 ## Working data sources
 
-Verified reachable from this machine on 2026-08-25. **Most exchange APIs
-(Binance, Coinbase, Kraken, Bybit, OKX) return HTTP 000 — connection blocked,
-most likely geographic.** Do not build on them here; funding rates and order
-book depth are not available without a proxy.
+Verified reachable from this machine on 2026-08-25.
+
+**On the exchange APIs.** Binance, Coinbase, Kraken, Bybit, and OKX initially
+returned HTTP 000 here. The cause was **ISP DNS hijacking, not geographic
+blocking** — `api.binance.com` resolved to `aduankonten.id`, Indonesia's block
+page, while the real CloudFront address answered normally. The IPs were never
+blocked; only DNS was poisoned.
+
+Diagnose before assuming a host is unreachable:
+
+```bash
+# Hijacked if the answer is aduankonten.id or all hosts share one IP
+getent hosts api.binance.com
+
+# Real address, via DNS-over-HTTPS the ISP cannot forge
+curl -s -H "accept: application/dns-json" \
+  "https://cloudflare-dns.com/dns-query?name=api.binance.com&type=A"
+
+# Confirm the IP itself is fine
+curl --resolve "api.binance.com:443:<ip>" \
+  "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+```
+
+The permanent fix is DNS-over-TLS at the system level
+(`/etc/systemd/resolved.conf.d/`). Once DNS is encrypted, every exchange API
+works normally and funding rates, open interest, and order book depth become
+available.
+
+If DNS is still hijacked, resolve through DoH inside the client and pin the
+result with `--resolve` rather than declaring the source unavailable.
 
 | Source | Gives you | Endpoint |
 |---|---|---|
@@ -44,7 +70,8 @@ book depth are not available without a proxy.
 | DefiLlama | TVL per chain, protocol revenue | `api.llama.fi/v2/chains` |
 | Alternative.me | Fear & Greed index | `api.alternative.me/fng/` |
 | CoinPaprika | price, supply, ATH distance | `api.coinpaprika.com/v1/tickers/` |
-| blockchain.info | BTC block height | `blockchain.info/q/getblockcount` |
+| Binance | spot price, funding rate, open interest | `api.binance.com`, `fapi.binance.com` |
+| Bybit / OKX | derivatives, funding rate | `api.bybit.com`, `www.okx.com/api/v5/` |
 
 Free tiers rate-limit. Cache within a session rather than refetching per
 question.
