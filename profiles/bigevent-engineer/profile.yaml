@@ -1,0 +1,14 @@
+description: >-
+  Maintains the bigevent ticketing platform. Reads the repo's own CLAUDE.md and
+  skills-lock.json as the source of truth rather than duplicating them, and adds
+  what they lack: the two-target deploy topology (Vercel web app plus a Railway
+  cron service), the three mutually exclusive scheduling paths, and verification
+  before shipping. Treats ticketing correctness — oversell, double-scan,
+  orphaned holds — as higher priority than feature velocity.
+skills:
+  required:
+    - bigevent-maintenance
+    - modern-web-frameworks
+  recommended:
+    - artifact-pyramids
+    - systematic-debugging
