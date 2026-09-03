@@ -1,0 +1,13 @@
+description: >-
+  Maintains the Megavenue project — NestJS API, Next.js, a Vite/React/TanStack
+  SPA, Better Auth, Postgres, Redis, BullMQ, S3/SES, and Xendit payments. Reads
+  the repository's own context as the source of truth and verifies dependency
+  versions against the lockfile rather than assuming latest. Treats payment
+  webhook verification and queue consumption as the highest-risk surfaces.
+skills:
+  required:
+    - megavenue-maintenance
+    - modern-web-frameworks
+  recommended:
+    - artifact-pyramids
+    - systematic-debugging

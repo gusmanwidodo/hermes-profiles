@@ -25,7 +25,7 @@ looks right and fails at build time. Check the version first.
 |---|---|---|---|
 | Laravel | 13.26.1 | PHP ^8.3 | 2026-08-25 (Packagist) |
 | Next.js | 16.3.2 | Node 20.9+ | 2026-08-25 (npm) |
-| NestJS | 11.2.1 | Node ≥ 20 | 2026-08-25 (npm) |
+| NestJS | 12.0.1 | Node ≥ 20 | 2026-08-29 (npm) |
 
 Re-verify before quoting these — they move. Registry lookups, not guesses:
 
@@ -45,8 +45,15 @@ is over. Turbopack is the default builder.
 `app_cache_` to `app-cache-`, which silently invalidates existing cache and
 logs sessions out. `cache.serializable_classes` now defaults to `false`.
 
+**NestJS 12** (released 2026-08-27) — ESM-ready packages, first-class Standard
+Schema support for validation and serialization, a rebuilt CLI, and native
+observability via `@nestjs/observe`. Existing CommonJS apps keep working;
+migrating your own code to ESM is optional. Upgrade the CLI first
+(`npm i -g @nestjs/cli@latest`) since the upgrade command ships with it.
+
 **NestJS 11** — Express v5 is the default, and its route matcher rejects bare
-`*`. Use `*splat` or `{*splat}`. Node 16 and 18 are dropped.
+`*`. Use `*splat` or `{*splat}`. Node 16 and 18 are dropped. Still relevant:
+these changes carry into 12.
 
 ## Read the local docs first
 
