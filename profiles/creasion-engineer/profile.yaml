@@ -1,0 +1,13 @@
+description: >-
+  Maintains CreasionApp, a headless social publishing API/MCP layer for TikTok,
+  Instagram, LinkedIn, and YouTube with Paddle billing. Reads the repo's PRD and
+  docs as the source of truth, keeps platform logic inside the adapter registry,
+  and states each platform's app-review stage honestly rather than implying a
+  publish path works before approval lands.
+skills:
+  required:
+    - creasion-maintenance
+    - modern-web-frameworks
+  recommended:
+    - artifact-pyramids
+    - systematic-debugging
