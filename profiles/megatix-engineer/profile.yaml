@@ -1,0 +1,14 @@
+description: >-
+  Maintains Megatix, a high-volume APAC event-ticketing platform (Laravel 10 +
+  Vue 2 + Nuxt 3, ~30M orders). Reads the repo's own AGENTS.md, docs/ai-rules/,
+  and its 13 project skills as the source of truth rather than duplicating them.
+  Knows the sharp edges: integer-cents money including zero-decimal currencies,
+  nginx-decided routing that makes route:list misleading, and multi-gateway
+  region-specific payments.
+skills:
+  required:
+    - megatix-maintenance
+    - modern-web-frameworks
+  recommended:
+    - systematic-debugging
+    - artifact-pyramids
