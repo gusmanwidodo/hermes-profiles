@@ -40,6 +40,38 @@ review situation.
 
 Worth rewriting. Until then, the code and `docs/` outrank it.
 
+## The live API surface
+
+`creasionapp.com` is live and its docs at `/docs` are current. Verified
+2026-09-11.
+
+```
+Authorization: Bearer <CREASION_API_KEY>
+
+GET  /v1/accounts       connected accounts — the `account` field is the value
+                        you pass when publishing, shape <platform>:<id>
+POST /v1/media          register media (pull from URL, or presigned PUT)
+POST /v1/posts          publish → 202 queued
+GET  /v1/posts/{id}     per-channel status + live URL
+POST /v1/webhooks       post.published / post.failed, signed HMAC-SHA256
+     /v1/mcp            hosted MCP: list_accounts, publish_post,
+                        schedule_post, get_post_status
+```
+
+Two things that bite:
+
+**Account values must be copied verbatim** from `/v1/accounts`. LinkedIn values
+carry a second colon (`linkedin:person:<id>`, `linkedin:org:<id>`), so
+constructing them by hand produces a string that looks right and fails.
+
+**LinkedIn carousels are document posts taking exactly one media item.** Send a
+single PDF with an optional `document_title`; more than one returns
+`validation_error` rather than quietly dropping extras. Limits are 100MB and
+300 pages.
+
+Errors are uniform — `code`, `retryable`, `retry_after_seconds`. Honour them
+rather than retrying blindly.
+
 ## Architecture that matters
 
 **Publish adapters.** `src/lib/publish/` is the core abstraction:
