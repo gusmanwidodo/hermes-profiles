@@ -104,6 +104,29 @@ systemctl --user is-enabled hermes-gateway-<name>.service    # enabled
 `sendMessage` returning **`chat not found` is normal** for a fresh bot: the user
 has not pressed Start yet. It is not a failure.
 
+### The unit name is not always predictable
+
+Most installs produce `hermes-gateway-<profile>.service`, but some produce a
+**hashed name** instead — `hermes-gateway-6b522f51.service`. Checking the
+predictable name then reports `inactive` / `not-found` for a gateway that is
+actually running fine.
+
+Find the real unit by its working directory:
+
+```bash
+grep -l "profiles/<name>$" ~/.config/systemd/user/hermes-gateway-*.service
+# or list what Hermes itself thinks is running, which resolves the profile name
+hermes gateway list
+```
+
+`hermes gateway list` shows the profile name and PID regardless of unit naming,
+so start there and work back to the unit.
+
+A related trap: a gateway can run as a **plain process with no systemd unit at
+all** — it works now and does not survive a reboot. If `hermes gateway list`
+shows a PID but no unit file matches, run `gateway install` to make it
+persistent.
+
 ## Diagnosing provider errors
 
 `⚠ Provider authentication failed` in chat means the credential is missing or
