@@ -38,6 +38,38 @@ systemctl --user show hermes-gateway-<name>.service -p NRestarts --value
 A counter in the hundreds means it has been failing in a loop, possibly for
 hours, while looking fine.
 
+### A health check that misses this is not a health check
+
+Observed 2026-09-28: the `ceo` gateway had a restart counter of **39,694**,
+caused by a hung `gateway restart` process that had held the lock since
+**19 September — nine days**. Throughout those nine days `is-active` returned
+`active` and socket counts looked plausible, so repeated "all 14 gateways
+healthy" reports were technically true and substantively wrong. The symptom the
+user actually saw was tasks being interrupted mid-run.
+
+**A gateway sweep must include NRestarts, and must check for stale lock
+holders** — not just active state and sockets:
+
+```bash
+# per profile: is the lock held by a `gateway run` (correct) or a hung
+# `gateway restart` (the bug)?
+for f in ~/.hermes/profiles/*/; do
+  p=$(basename "$f"); lk="$f/gateway.lock"; [ -f "$lk" ] || continue
+  python3 - "$p" "$lk" <<'PY'
+import json, sys, os
+prof, path = sys.argv[1], sys.argv[2]
+d = json.load(open(path))
+pid, argv = d.get("pid"), " ".join(d.get("argv", [])[-2:])
+alive = os.path.exists(f"/proc/{pid}")
+flag = "  <-- HUNG RESTART" if "restart" in argv else ""
+print(f"{prof:<22} pid={pid} alive={alive} {argv}{flag}")
+PY
+done
+```
+
+Any lock whose `argv` ends in `restart` is the bug, regardless of how long it
+has been there.
+
 ## Do not use `hermes gateway restart`
 
 That command hangs. When it does, it holds `gateway.lock`, and every service
