@@ -70,6 +70,39 @@ done
 Any lock whose `argv` ends in `restart` is the bug, regardless of how long it
 has been there.
 
+### Socket count has an upper bound too
+
+`2` or more means polling. But **a count far above 4 is its own symptom** —
+failed requests whose connections never closed.
+
+Observed 2026-10-09: `megavenue-engineer` sat at **36 sockets**, `active`, with
+a correct `gateway run` lock and no stderr-level errors. It looked healthy by
+every check in this skill and was in fact frozen: a 7-day-old process was
+retrying against `base_url=https://api.anthropic.com` while the account
+authenticates through Nous Portal, so every call failed and retried three times.
+
+**A long-lived process can hold stale config in memory.** Config on disk being
+correct proves nothing about what a running process is using — compare
+`ExecMainStartTimestamp` against when the config last changed.
+
+### Check the log for retry loops, not just errors
+
+Retry warnings are logged at WARNING, so `journalctl -p err` returns
+"No entries" while the gateway is looping. Grep the body instead:
+
+```bash
+journalctl --user -u hermes-gateway-<name> --since "30 min ago" --no-pager \
+  | grep -cE "APIConnectionError|Retrying API call"
+```
+
+Non-zero means the agent is burning time on calls that cannot succeed. The user
+experiences this as the bot freezing — it is waiting, not dead, which is why
+every status check says it is fine.
+
+Also worth reading from that log line: it prints the `base_url` and `model`
+actually in use. That is the fastest way to catch a process pointed at the wrong
+endpoint.
+
 ## Do not use `hermes gateway restart`
 
 That command hangs. When it does, it holds `gateway.lock`, and every service
