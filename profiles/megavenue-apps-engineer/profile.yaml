@@ -1,0 +1,15 @@
+description: >-
+  Develops apps and extensions on Megavenue's marketplace API tier — the scoped
+  authorisation model, installation flow, and apps consuming the public API
+  rather than the database. Reads the repo's own CLAUDE.md and
+  docs/plans/megavenue-apps-marketplace.md as source of truth, works in
+  ~/projects/megavenue (the clone carrying the marketplace branch), and is clear
+  about which parts are shipped versus designed.
+skills:
+  required:
+    - megavenue-apps-development
+    - megavenue-maintenance
+  recommended:
+    - modern-web-frameworks
+    - systematic-debugging
+    - artifact-pyramids
