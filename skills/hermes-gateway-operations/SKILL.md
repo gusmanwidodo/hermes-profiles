@@ -103,8 +103,37 @@ Also worth reading from that log line: it prints the `base_url` and `model`
 actually in use. That is the fastest way to catch a process pointed at the wrong
 endpoint.
 
-## Do not use `hermes gateway restart`
+## An agent CAN restart another profile's gateway
 
+The guard blocks `systemctl restart/stop` and `hermes gateway restart` from
+inside a gateway process. But `kill <pid>` on a plain PID is allowed, and
+Hermes gateway units ship with `Restart=always`.
+
+So for any profile **other than the one serving the current conversation**:
+
+```bash
+# 1. confirm systemd will bring it back — without this, kill just kills it
+systemctl --user show hermes-gateway-<name>.service -p Restart --value   # want: always
+
+# 2. kill the main process; systemd restarts it in ~15-25s
+kill $(systemctl --user show hermes-gateway-<name>.service -p MainPID --value)
+
+# 3. verify the NEW pid, not the old one
+sleep 25
+PID=$(systemctl --user show hermes-gateway-<name>.service -p MainPID --value)
+ss -tnp | grep "$PID" | grep -c 149.154        # want 2-4
+```
+
+Check `Restart=always` first. Without it this is not a restart, it is an
+outage.
+
+**This does not work for the profile running the agent** — killing it drops the
+conversation mid-turn. That one still needs a shell outside the gateway.
+
+Verified 2026-10-18 on `megavenue-engineer`: a 22-day-old process holding 48
+stale sockets came back at 2, with the lock correctly reassigned to the new pid.
+
+## Do not use `hermes gateway restart`
 That command hangs. When it does, it holds `gateway.lock`, and every service
 start after it fails with *"Gateway already running (PID ...)"* — then systemd
 retries every 5 seconds while the gateway needs ~16 seconds to boot, so the
