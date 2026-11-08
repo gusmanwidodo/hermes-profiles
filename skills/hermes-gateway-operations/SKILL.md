@@ -103,6 +103,61 @@ Also worth reading from that log line: it prints the `base_url` and `model`
 actually in use. That is the fastest way to catch a process pointed at the wrong
 endpoint.
 
+## A third failure mode: send dies while polling survives
+
+Observed 2026-11-08 on `bigevent-engineer`. The bot answered nothing, yet every
+check in this skill was green: socket 6, NRestarts 3, lock held by `gateway
+run`, zero retry-loop entries, zero stderr errors.
+
+The log told the real story:
+
+```
+WARNING gateway.run: Prompt send failed: Not connected
+WARNING gateway.run: Clarify send failed definitively; clearing registration
+WARNING gateway.run: Button-based approval failed (send returned error)
+```
+
+The agent was **waiting for an approval it could not deliver**. Polling still
+worked, so it received messages; the send path was dead, so nothing came back.
+From the user's side that is indistinguishable from a hang.
+
+**The discriminating test:** send through the bot token with curl while the
+gateway claims `Not connected`.
+
+```bash
+TOK=$(grep '^TELEGRAM_BOT_TOKEN=' <profile>/.env | cut -d= -f2-)
+curl -s "https://api.telegram.org/bot${TOK}/sendMessage" \
+  --data-urlencode "chat_id=<id>" --data-urlencode "text=probe" \
+  -w "HTTP:%{http_code}\n"
+```
+
+curl returning 200 while the gateway cannot send proves the credential and
+Telegram are fine and the gateway's own connection is stale. Restart fixes it.
+
+Add this grep to any sweep — it catches what socket counts cannot:
+
+```bash
+journalctl --user -u hermes-gateway-<name> --since "1 hour ago" --no-pager \
+  | grep -ciE "Not connected|send failed|Clarify send failed"
+```
+
+## Long-lived processes are the common factor
+
+Three gateways failed in one week. All three were old processes:
+
+| Profile | Process age | Symptom |
+|---|---|---|
+| `ceo` | hung restart held 9 days | crash-loop, 39,694 restarts |
+| `megavenue-engineer` | 7 days, then 22 days | retry-loop on a stale endpoint; 48 stale sockets |
+| `bigevent-engineer` | 39 days | send path dead, polling alive |
+
+Short-lived processes have not misbehaved. Whatever accumulates — sockets,
+stale clients, dead connections — does so with uptime.
+
+**Practical consequence:** treat a process older than ~2 weeks as suspect even
+when its indicators look clean, and prefer recycling it over waiting for a
+symptom the user has to report.
+
 ## An agent CAN restart another profile's gateway
 
 The guard blocks `systemctl restart/stop` and `hermes gateway restart` from
