@@ -99,8 +99,14 @@ ffmpeg -i in.mp4 -vf "subtitles=subs.srt:force_style='FontSize=18,MarginV=60'" o
 ffprobe -v error -show_entries stream=width,height,duration -of default=noprint_wrappers=1 out.mp4
 ```
 
-**Voiceover → edge-tts**, free, no API key. Two Indonesian voices:
-`id-ID-ArdiNeural` (male), `id-ID-GadisNeural` (female).
+**Voiceover → Piper TTS**, fully offline, no API key. Indonesian voice
+`id_ID-news_tts-medium` at `~/.local/share/piper-voices/`, 11.5× realtime.
+
+**edge-tts no longer works** — Microsoft's free endpoint returns 403. Piper
+replaces it and cannot be cut off, being local.
+
+For the full narrated-video pipeline with auto-synced subtitles at near-zero
+token cost, load `token-cheap-video`.
 
 Use TTS for **prototyping** — test whether the script and pacing work before
 committing to a real recording. For anything building personal credibility, a
