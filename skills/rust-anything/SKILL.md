@@ -5,27 +5,31 @@ description: Port TypeScript/JavaScript, Python, C, Go, Ruby or Java to Rust wit
 
 # Migration to Rust with rust-anything
 
-> **Status on this machine, verified 2026-11-22: the CLI is NOT installed.**
+> **Installed and verified on this machine, 2026-11-22.**
 >
-> Neither `cargo`, `rustc`, nor `rust-anything` exists here. Every command in
-> this file depends on the `rust-anything` binary, so **nothing below can run
-> yet**. Before planning any port, tell Gusman this and ask him to run:
->
-> ```sh
-> curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # installs cargo
-> cargo install rust-anything
-> rust-anything setup
+> ```
+> rustc 1.100.0      cargo 1.100.0      rust-anything 3.2.0
+> doctor: "Everything required is in place" — MCP answered with 22 tools
+> runtimes detected: node v24.19.0, python3 3.11.16, cc 15.2.0
 > ```
 >
-> Then restart the agent. `rust-anything doctor` reports what is still missing.
+> Binaries live in `~/.cargo/bin`, which is **not on the default PATH** for
+> non-login shells. Prefix commands with
+> `export PATH="$HOME/.cargo/bin:$PATH"` or call the absolute path.
 >
-> Do not improvise a port by hand to work around the missing CLI. The whole
-> value of this skill is that the original's recorded behaviour gates every
-> step; porting without that gate is just rewriting code and hoping.
+> MCP is registered for Claude Code and OpenCode (both backed up first).
+> Restart the agent before expecting the MCP tools; the CLI works immediately.
 >
-> **Relevance here:** the Hermes stack is Next.js/TypeScript, Laravel/PHP, and
-> Python. Note the PHP limitation below — `bridge` does not take PHP units, so
-> a Laravel port stops at the front door.
+> Verified against real code: `analyze ~/projects/ogforge --lang ts` returned
+> 20 units with readiness scores and per-unit risks.
+>
+> **Stack notes.** TypeScript (napi-rs bridge) and Python (PyO3) are ready.
+> **PHP is not** — `bridge` takes no PHP units, so a Laravel/megatix port stops
+> at the front door. Optional and absent: Java/Kotlin, PHP, .NET, wasm targets,
+> Android NDK. Each matters only for the language you actually port.
+>
+> Do not hand-port around a missing piece. The recorded-behaviour gate is the
+> entire value here; porting without it is rewriting code and hoping.
 
 rust-anything gives you ground truth; you write the Rust. Port one unit at a time, even when the
 goal is the whole app, and call a port done only when `gate` passes.
